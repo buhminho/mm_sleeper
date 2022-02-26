@@ -40,9 +40,9 @@ Module.register("mm_sleeper", {
 					];
 
 		var now = new Date();
-		console.log(now);
+		// console.log(now);
 		
-		console.log("yeah: " + this.jsonDB[0].fname + "  ");
+		// console.log("yeah: " + this.jsonDB[0].fname + "  ");
 		
 	},
 	/*
@@ -54,7 +54,7 @@ Module.register("mm_sleeper", {
 	getData: function() {
 		var self = this;
 
-		var urlApi = "https://jsonplaceholder.typicode.com/posts/1";
+		var urlApi = "https://api.sleeper.app/v1/league/726127230773702656/users";
 		var retry = true;
 
 		var dataRequest = new XMLHttpRequest();
@@ -64,7 +64,30 @@ Module.register("mm_sleeper", {
 			if (this.readyState === 4) {
 				console.log(this.status);
 				if (this.status === 200) {
+					const users = JSON.parse(this.response);
+					if (databaseExists("sleeperdb", function (yesno) {
+						if( yesno ) {
+							
+						}
+						else {
+							writeStateToIndexedDB("users", users);
+						}
+					  }));
 					self.processData(JSON.parse(this.response));
+					if (window.indexedDB) {
+						console.log("Ihr Browser unterstützt IndexedDB");
+					}
+					/*
+					if (databaseExists("sleeperdb", function (yesno) {
+	
+						if( yesno ) {
+							console.log("Datenbank nicht verfügbar")
+						}
+						else {
+						  console.log("Datenbank nicht verfügbar")
+						}
+					  }));
+					  */
 				} else if (this.status === 401) {
 					self.updateDom(self.config.animationSpeed);
 					Log.error(self.name, this.status);
@@ -170,3 +193,120 @@ Module.register("mm_sleeper", {
 		}
 	},
 });
+// IndexedDB
+function writeStateToIndexedDB(storename, datenAusAPI) {
+	databaseExists("sleeperdb", function (yesno) {
+	  if( yesno ) { 
+		// // write new state in existing database
+		// var request = window.indexedDB.open("sleeperdb", 2);
+		// request.onsuccess = function (event) 
+		// {
+		//   var db = event.target.result;
+		//   // Delete old state
+		//   //console.log(""+storename+"");
+		//   var request = db.transaction([""+storename+""], "readwrite")
+		//   .objectStore(storename)
+		//   .delete(arrayname);
+		//   // Add new state
+		//   var transaction =  db.transaction(storename, "readwrite");
+		//   const savedstateData = [
+		// 	{ data: arrayname, state: data }
+		//   ];
+  
+		//   transaction.onerror = function(event) {
+		// 	console.log("Error saving new state: " + event.target);
+		//   };
+  
+		//   var objectStore = transaction.objectStore(storename);
+		//   for (var i in savedstateData) {
+		// 	var request = objectStore.add(savedstateData[i]);
+		// 	request.onsuccess = function(event) {
+		// 	  console.log("saving new state: " + event.target);
+		// 	};
+		//   }
+		  
+		// }
+		// request.onerror = function (event) {
+		//   console.log("No Connection to sleeperdb IndexedDB!");
+		// }
+	   
+	  }
+	  else {
+		// Create sleeperdb IndexedDB
+		
+	
+		const dbName = "sleeper";
+		var request = indexedDB.open(dbName, 2);
+		request.onerror = function(event) {
+		   window.alert(event)
+		};
+		const ownerData = [
+			{ id: "444-44-4444", name: "Bill"}			
+		  ];
+		request.onupgradeneeded = function(event) {
+		   var db = event.target.result;
+		   var objectStore = db.createObjectStore("owners", { keyPath: "id" });
+		   //objectStore.createIndex("id", "id", { unique: true });
+		   for (var i in ownerData) {
+			  console.log(ownerData[i]);
+			  objectStore.add(ownerData[i]);
+		  }
+	    }; 
+	  }
+	});      
+  }
+  function readStateFromIndexedDB(storename, arrayname, key_term, value_term) {
+	if (databaseExists("sleeperdb", function (yesno) {
+	  if( yesno ) { sleeperdb
+	  var request = window.indexedDB.open("sleeperdb", 2);
+	  request.onsuccess = function (event) 
+	  {
+		db = request.result;
+		console.log('The database is opened successfully');
+  
+		db.transaction(storename).objectStore(storename).get(arrayname).onsuccess = function(event) {
+		  $("#container").append(filter_players(event.target.result.state), key_term, value_term);
+		};
+		return true;
+	  }
+	  request.onerror = function (event) {
+		console.log("Keine Verbindung zur IndexedDB hergestellt");
+		return false;
+	  }
+	}
+	})
+	) return true;
+	else return false;
+	sleeperdb
+   
+	
+  }
+  function databaseExists(dbname, callback) {
+	var req = indexedDB.open(dbname);
+	var existed = true;
+	req.onsuccess = function () {
+		req.result.close();
+		if (!existed)
+			indexedDB.deleteDatabase(dbname);
+		callback(existed);
+	}
+	req.onupgradeneeded = function () {
+		existed = false;
+	}
+  }
+  function deleteIndexedDB() {
+	databaseExists("sleeperdb", function (yesno) {
+	  if( yesno ) { 
+		var req = indexedDB.deleteDatabase("sleeperdb");
+		req.onsuccess = function () {
+		  console.log("Deleted database successfully");
+		};
+		req.onerror = function () {
+		  console.log("Couldn't delete database");
+		};
+		req.onblocked = function () {
+		  console.log("Couldn't delete database due to the operation being blocked");
+		};
+	  }
+	  });
+  }
