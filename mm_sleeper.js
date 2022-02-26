@@ -196,53 +196,17 @@ Module.register("mm_sleeper", {
 // IndexedDB
 function writeStateToIndexedDB(storename, datenAusAPI) {
 	databaseExists("sleeperdb", function (yesno) {
-	  if( yesno ) { 
-		// // write new state in existing database
-		// var request = window.indexedDB.open("sleeperdb", 2);
-		// request.onsuccess = function (event) 
-		// {
-		//   var db = event.target.result;
-		//   // Delete old state
-		//   //console.log(""+storename+"");
-		//   var request = db.transaction([""+storename+""], "readwrite")
-		//   .objectStore(storename)
-		//   .delete(arrayname);
-		//   // Add new state
-		//   var transaction =  db.transaction(storename, "readwrite");
-		//   const savedstateData = [
-		// 	{ data: arrayname, state: data }
-		//   ];
-  
-		//   transaction.onerror = function(event) {
-		// 	console.log("Error saving new state: " + event.target);
-		//   };
-  
-		//   var objectStore = transaction.objectStore(storename);
-		//   for (var i in savedstateData) {
-		// 	var request = objectStore.add(savedstateData[i]);
-		// 	request.onsuccess = function(event) {
-		// 	  console.log("saving new state: " + event.target);
-		// 	};
-		//   }
-		  
-		// }
-		// request.onerror = function (event) {
-		//   console.log("No Connection to sleeperdb IndexedDB!");
-		// }
-	   
-	  }
-	  else {
-		// Create sleeperdb IndexedDB
-		
+	 
 	
 		const dbName = "sleeper";
 		var request = indexedDB.open(dbName, 2);
 		request.onerror = function(event) {
 		   window.alert(event)
 		};
-		const ownerData = [
-			{ id: "444-44-4444", name: "Bill"}			
-		  ];
+		let ownerData = [];
+		for (var i in datenAusAPI) {
+			ownerData.push({id: datenAusAPI[i].user_id, name:datenAusAPI[i].display_name})
+		}
 		request.onupgradeneeded = function(event) {
 		   var db = event.target.result;
 		   var objectStore = db.createObjectStore("owners", { keyPath: "id" });
@@ -252,7 +216,7 @@ function writeStateToIndexedDB(storename, datenAusAPI) {
 			  objectStore.add(ownerData[i]);
 		  }
 	    }; 
-	  }
+	
 	});      
   }
   function readStateFromIndexedDB(storename, arrayname, key_term, value_term) {
