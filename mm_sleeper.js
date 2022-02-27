@@ -7,6 +7,39 @@
  * MIT Licensed.
  */
 
+
+function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback) {
+	var retry = true;
+
+	var dataRequest = new XMLHttpRequest();
+	dataRequest.open("GET", urlApi, true);
+	dataRequest.onreadystatechange = function () {
+		console.log(this.readyState);
+		if (this.readyState === 4) {
+			console.log(this.status);
+			if (this.status === 200) {
+				const users = JSON.parse(this.response);
+				let datenAusAPIReduziert = formatterCallback(users);
+				storeDownloadInDB("sleeperdb", targetStore, datenAusAPIReduziert);
+
+
+				self.processData(JSON.parse(this.response));
+
+			} else if (this.status === 401) {
+				self.updateDom(self.config.animationSpeed);
+				Log.error(self.name, this.status);
+				retry = false;
+			} else {
+				Log.error(self.name, "Could not load data.");
+			}
+			if (retry) {
+				self.scheduleUpdate((self.loaded) ? -1 : self.config.retryDelay);
+			}
+		}
+	};
+	return dataRequest;
+}
+
 Module.register("mm_sleeper", {
 	defaults: {
 		updateInterval: 60000,
@@ -15,7 +48,7 @@ Module.register("mm_sleeper", {
 	},
 
 	requiresVersion: "2.1.0", // Required version of MagicMirror
-
+	
 	start: function() {
 		var self = this;
 		var dataRequest = null;
@@ -24,6 +57,7 @@ Module.register("mm_sleeper", {
 		//Flag for check if module is loaded
 		this.loaded = false;
 
+		
 		// Schedule update timer.
 		this.getData();
 		setInterval(function() {
@@ -45,6 +79,7 @@ Module.register("mm_sleeper", {
 		// console.log("yeah: " + this.jsonDB[0].fname + "  ");
 		
 	},
+
 	/*
 	 * getData
 	 * function example return data and show it in the module wrapper
@@ -53,54 +88,20 @@ Module.register("mm_sleeper", {
 	 */
 	getData: function() {
 		var self = this;
+		if (!window.indexedDB) {
+			console.log("Ihr Browser kein IndexedDB, WTF?");
+		}
+
 
 		var urlApi = "https://api.sleeper.app/v1/league/726127230773702656/users";
-		var retry = true;
-
-		var dataRequest = new XMLHttpRequest();
-		dataRequest.open("GET", urlApi, true);
-		dataRequest.onreadystatechange = function() {
-			console.log(this.readyState);
-			if (this.readyState === 4) {
-				console.log(this.status);
-				if (this.status === 200) {
-					const users = JSON.parse(this.response);
-					if (databaseExists("sleeperdb", function (yesno) {
-						if( yesno ) {
-							
-						}
-						else {
-							writeStateToIndexedDB("users", users);
-						}
-					  }));
-					self.processData(JSON.parse(this.response));
-					if (window.indexedDB) {
-						console.log("Ihr Browser unterstützt IndexedDB");
-					}
-					/*
-					if (databaseExists("sleeperdb", function (yesno) {
-	
-						if( yesno ) {
-							console.log("Datenbank nicht verfügbar")
-						}
-						else {
-						  console.log("Datenbank nicht verfügbar")
-						}
-					  }));
-					  */
-				} else if (this.status === 401) {
-					self.updateDom(self.config.animationSpeed);
-					Log.error(self.name, this.status);
-					retry = false;
-				} else {
-					Log.error(self.name, "Could not load data.");
-				}
-				if (retry) {
-					self.scheduleUpdate((self.loaded) ? -1 : self.config.retryDelay);
-				}
-			}
-		};
+		var dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"owners", prepareOwnerData);
 		dataRequest.send();
+
+
+		urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
+		dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"owners", prepareTrendingPlayersData);
+		dataRequest.send();
+
 	},
 
 
@@ -193,84 +194,68 @@ Module.register("mm_sleeper", {
 		}
 	},
 });
+let db;
 // IndexedDB
-function writeStateToIndexedDB(storename, datenAusAPI) {
-	databaseExists("sleeperdb", function (yesno) {
-	 
-	
-		const dbName = "sleeper";
-		var request = indexedDB.open(dbName, 2);
-		request.onerror = function(event) {
+
+
+function initializeStores(request) {
+	return function () {
+		console.log("db und stores nicht vorhanden oder version höher, alles wird angelegt. ");
+
+		const db = request.result;
+		const array = ["owners", "allPlayers", "trendingPlayers", "timestamps"]
+
+		array.forEach(function (storename) {
+
+			try {
+				console.log("deleting " + storename);
+				db.deleteObjectStore(storename)
+			} catch (e) {
+				console.log(storename + " did not exist")
+			}
+			db.createObjectStore(storename, {keyPath: "id"});
+			console.log("created " + storename);
+		});
+
+	};
+}
+
+function storeDownloadInDB(dbName,targetStore, datenAusAPI) {
+
+	var request = indexedDB.open(dbName, 6);
+	request.onerror = function(event) {
 		   window.alert(event)
-		};
-		let ownerData = [];
-		for (var i in datenAusAPI) {
-			ownerData.push({id: datenAusAPI[i].user_id, name:datenAusAPI[i].display_name})
+	};
+
+	request.onupgradeneeded = initializeStores(request);
+	
+
+	request.onsuccess = function(){
+		const db = request.result;
+		console.log("db inserts...");
+		const ownerStore = db.transaction(targetStore, "readwrite").objectStore("owners");
+		for (const ownerEintrag of datenAusAPI) {
+			console.log(ownerEintrag);
+			ownerStore.add(ownerEintrag);
 		}
-		request.onupgradeneeded = function(event) {
-		   var db = event.target.result;
-		   var objectStore = db.createObjectStore("owners", { keyPath: "id" });
-		   //objectStore.createIndex("id", "id", { unique: true });
-		   for (var i in ownerData) {
-			  console.log(ownerData[i]);
-			  objectStore.add(ownerData[i]);
-		  }
-	    }; 
-	
-	});      
+	}
+	 
   }
-  function readStateFromIndexedDB(storename, arrayname, key_term, value_term) {
-	if (databaseExists("sleeperdb", function (yesno) {
-	  if( yesno ) { sleeperdb
-	  var request = window.indexedDB.open("sleeperdb", 2);
-	  request.onsuccess = function (event) 
-	  {
-		db = request.result;
-		console.log('The database is opened successfully');
+function prepareOwnerData(users) {
+	let ownerData = [];
+	for (var i in users) {
+		ownerData.push({id: users[i].user_id, name: users[i].display_name})
+	}
+	return ownerData;
+}
+
+function prepareTrendingPlayersData(players) {
+	let ownerData = [];
+	for (var i in players) {
+		ownerData.push({id: players[i].player_id, count: players[i].count, owner: "todo" , displayname: "todo"})
+	}
+	return ownerData;
+}
+
+
   
-		db.transaction(storename).objectStore(storename).get(arrayname).onsuccess = function(event) {
-		  $("#container").append(filter_players(event.target.result.state), key_term, value_term);
-		};
-		return true;
-	  }
-	  request.onerror = function (event) {
-		console.log("Keine Verbindung zur IndexedDB hergestellt");
-		return false;
-	  }
-	}
-	})
-	) return true;
-	else return false;
-	sleeperdb
-   
-	
-  }
-  function databaseExists(dbname, callback) {
-	var req = indexedDB.open(dbname);
-	var existed = true;
-	req.onsuccess = function () {
-		req.result.close();
-		if (!existed)
-			indexedDB.deleteDatabase(dbname);
-		callback(existed);
-	}
-	req.onupgradeneeded = function () {
-		existed = false;
-	}
-  }
-  function deleteIndexedDB() {
-	databaseExists("sleeperdb", function (yesno) {
-	  if( yesno ) { 
-		var req = indexedDB.deleteDatabase("sleeperdb");
-		req.onsuccess = function () {
-		  console.log("Deleted database successfully");
-		};
-		req.onerror = function () {
-		  console.log("Couldn't delete database");
-		};
-		req.onblocked = function () {
-		  console.log("Couldn't delete database due to the operation being blocked");
-		};
-	  }
-	  });
-  }
