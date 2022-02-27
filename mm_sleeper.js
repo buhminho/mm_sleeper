@@ -99,7 +99,7 @@ Module.register("mm_sleeper", {
 
 
 		urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
-		dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"owners", prepareTrendingPlayersData);
+		dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"trendingPlayers", prepareTrendingPlayersData);
 		dataRequest.send();
 
 	},
@@ -233,7 +233,7 @@ function storeDownloadInDB(dbName,targetStore, datenAusAPI) {
 	request.onsuccess = function(){
 		const db = request.result;
 		console.log("db inserts...");
-		const ownerStore = db.transaction(targetStore, "readwrite").objectStore("owners");
+		const ownerStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
 		for (const ownerEintrag of datenAusAPI) {
 			console.log(ownerEintrag);
 			ownerStore.add(ownerEintrag);
