@@ -12,9 +12,9 @@ function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback)
 	var dataRequest = new XMLHttpRequest();
 	dataRequest.open("GET", urlApi, true);
 	dataRequest.onreadystatechange = function () {
-		console.log(this.readyState);
+		//console.log(this.readyState);
 		if (this.readyState === 4) {
-			console.log(this.status);
+			//console.log(this.status);
 			if (this.status === 200) {
 				const users = JSON.parse(this.response);
 				let datenAusAPIReduziert = formatterCallback(users);
@@ -66,15 +66,47 @@ Module.register("mm_sleeper", {
 	},
 
     myShit: function(){
-
 	 	this.jsonDB=  [{ fname : "John", lname : "Hancock", value : 49.5 },
 					{ fname : "John", lname : "Hancock", value : 95.0 }
 					];
-
 		var now = new Date();
 		// console.log(now);
-		
 		// console.log("yeah: " + this.jsonDB[0].fname + "  ");
+		let dbDataRequest = false;
+		// change title depending on fetched db-data:
+			document.getElementById("nfl-title").innerHTML = '<i class="fas fa-football-ball"></i> TRENDING PLAYERS:';
+		
+		/*
+		if (document.getElementById("player-list")) {
+			var playerDataWrapper = document.getElementById("player-list");
+			var playerList = document.createElement("ul");
+				playerDataWrapper.appendChild(playerList);
+			// If this.dataRequest is not empty
+			if (dbDataRequest) {
+				var players = this.dataRequest;
+				players.forEach(player => {
+					console.log(Object.keys(player));
+					var li = document.createElement('li');
+					li.setAttribute('class','player');
+					playerList.appendChild(li);
+					// Show 
+					if (player.type == "ownerData") li.innerHTML=li.innerHTML + player.name;
+					if (player.type == "TrendingPlayers") li.innerHTML=li.innerHTML + player.displayname;
+				});
+			
+
+				// append player-list-wrapper
+				wrapper.appendChild(playerDataWrapper);
+					if (this.dataRequest.some(e => e.type === 'ownerData')) {
+						alert("OWNER DATA");
+					}
+					if (this.dataRequest.some(e => e.type === 'TrendingPlayers')) {
+						alert("TRENDING PLAYERS");
+					}
+				
+			}
+		}
+		*/
 		
 	},
 
@@ -99,7 +131,7 @@ Module.register("mm_sleeper", {
 		urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
 		dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"trendingPlayers", prepareTrendingPlayersData);
 		dataRequest.send();
-		console.log(dataRequest);
+		//console.log(dataRequest);
 	},
 
 
@@ -131,36 +163,21 @@ Module.register("mm_sleeper", {
 			document.head.appendChild(script);
 		}
 		// create element wrapper for show into the module
-		var wrapper = document.createElement("div");
-			wrapper.className = "player-wrapper";
-		var wrapperDataRequest = document.createElement("div");
-			wrapperDataRequest.className = "player-data";
-		var labelDataRequest = document.createElement("label");
-			labelDataRequest.className = "title";
-		// create title
-			labelDataRequest.innerHTML = '<i class="fas fa-football-ball"></i> Trending Players:';
-		wrapper.appendChild(labelDataRequest);
-		// create player-list-wrapper
-		var playerDataWrapper = document.createElement("div");
-			playerDataWrapper.setAttribute("id", "player-list");
-		
-		var playerList = document.createElement("ul");
-			playerDataWrapper.appendChild(playerList);
-		// If this.dataRequest is not empty
-		if (this.dataRequest) {
-			var players = this.dataRequest
-			players.forEach(renderProductList);
-			function renderProductList(element) {
-				console.log(element);
-				var li = document.createElement('li');
-				li.setAttribute('class','player');
-				playerList.appendChild(li);
-				li.innerHTML=li.innerHTML + element.player_id; // replace .player_id with .displayname
-			}
-			// append player-list-wrapper
-			wrapper.appendChild(playerDataWrapper);
+	
+		if (!document.getElementById("player-wrapper")) {
+			var wrapper = document.createElement("div");
+				wrapper.className = "player-wrapper";
+			var wrapperDataRequest = document.createElement("div");
+				wrapperDataRequest.className = "player-data";
+			var labelDataRequest = document.createElement("label");
+				labelDataRequest.setAttribute("id", "nfl-title");
+				labelDataRequest.innerHTML = '<i class="fas fa-spinner"></i> LOADING NFL-NEWS'
+			wrapper.appendChild(labelDataRequest);
+			// create player-list-wrapper
+			var playerDataWrapper = document.createElement("div");
+				playerDataWrapper.setAttribute("id", "player-list");
+				wrapper.appendChild(playerDataWrapper);
 		}
-		
 		// Data from helper
 		if (this.dataNotification) {
 			var wrapperDataNotification = document.createElement("div");
@@ -250,10 +267,10 @@ function storeDownloadInDB(dbName,targetStore, datenAusAPI) {
 
 	request.onsuccess = function(){
 		const db = request.result;
-		console.log("db inserts...");
+		//console.log("db inserts...");
 		const ownerStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
 		for (const ownerEintrag of datenAusAPI) {
-			console.log(ownerEintrag);
+			//console.log(ownerEintrag);
 			ownerStore.add(ownerEintrag);
 		}
 	}
@@ -262,7 +279,7 @@ function storeDownloadInDB(dbName,targetStore, datenAusAPI) {
 function prepareOwnerData(users) {
 	let ownerData = [];
 	for (var i in users) {
-		ownerData.push({id: users[i].user_id, name: users[i].display_name})
+		ownerData.push({id: users[i].user_id, name: users[i].display_name, type: "ownerData", })
 	}
 	return ownerData;
 }
@@ -270,10 +287,9 @@ function prepareOwnerData(users) {
 function prepareTrendingPlayersData(players) {
 	let ownerData = [];
 	for (var i in players) {
-		ownerData.push({id: players[i].player_id, count: players[i].count, owner: "todo" , displayname: "todo"})
+		ownerData.push({id: players[i].player_id, count: players[i].count, owner: "todo" , displayname: "todo", type: "TrendingPlayers"})
 	}
 	return ownerData;
 }
-
 
   
