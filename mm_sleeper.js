@@ -8,34 +8,34 @@
  */
 function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback) {
 	var retry = true;
+	console.log("handle: " + targetStore);
+	let responsePromise = fetch(urlApi);
+	responsePromise.then(async function (response) {
+		console.log(response.status);
 
-	var dataRequest = new XMLHttpRequest();
-	dataRequest.open("GET", urlApi, true);
-	dataRequest.onreadystatechange = function () {
-		//console.log(this.readyState);
-		if (this.readyState === 4) {
-			//console.log(this.status);
-			if (this.status === 200) {
-				const users = JSON.parse(this.response);
-				let datenAusAPIReduziert = formatterCallback(users);
-				storeDownloadInDB("sleeperdb", targetStore, datenAusAPIReduziert);
+		if (response.status === 200) {
+			await response.json().then(function (dataFromAPI) {
+
+				let datenAusAPIReduziert = formatterCallback(dataFromAPI);
+				storeDownloadInDB(targetStore, datenAusAPIReduziert);
 
 
-				self.processData(JSON.parse(this.response));
-
-			} else if (this.status === 401) {
-				self.updateDom(self.config.animationSpeed);
-				Log.error(self.name, this.status);
-				retry = false;
-			} else {
-				Log.error(self.name, "Could not load data.");
-			}
-			if (retry) {
-				self.scheduleUpdate((self.loaded) ? -1 : self.config.retryDelay);
-			}
+				self.processData(dataFromAPI);
+			});
+		} else if (response.status === 401) {
+			self.updateDom(self.config.animationSpeed);
+			Log.error(self.name, response.status);
+			retry = false;
+		} else {
+			Log.error(self.name, "Could not load data.");
 		}
-	};
-	return dataRequest;
+		if (retry) {
+			self.scheduleUpdate((self.loaded) ? -1 : self.config.retryDelay);
+		}
+
+	});
+
+	return responsePromise;
 }
 
 Module.register("mm_sleeper", {
@@ -49,8 +49,6 @@ Module.register("mm_sleeper", {
 	
 	start: function() {
 		var self = this;
-		var dataRequest = null;
-		var dataNotification = null;
 
 		//Flag for check if module is loaded
 		this.loaded = false;
@@ -62,7 +60,7 @@ Module.register("mm_sleeper", {
 			self.updateDom();
 		}, this.config.updateInterval);
 
-		setInterval(self.myShit,3000)
+		setInterval(self.myShit,10000)
 	},
 
     myShit: function(){
@@ -122,16 +120,18 @@ Module.register("mm_sleeper", {
 			console.log("Ihr Browser kein IndexedDB, WTF?");
 		}
 
-
 		var urlApi = "https://api.sleeper.app/v1/league/726127230773702656/users";
-		var dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"owners", prepareOwnerData);
-		dataRequest.send();
+		loadOwnersAndStoreThemToDB(urlApi, self, "owners", prepareOwnerData).then(function () {
+				urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
+				loadOwnersAndStoreThemToDB(urlApi, self, "trendingPlayers", prepareTrendingPlayersData).then(function () {
+						console.log("resultchecks...")
+						let valueByIdFromStorePromise = loadValueByIdFromStore("owners");
+						valueByIdFromStorePromise.then(function(data){console.log(data)});
 
+					});
+			}
+		);
 
-		urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
-		dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"trendingPlayers", prepareTrendingPlayersData);
-		dataRequest.send();
-		//console.log(dataRequest);
 	},
 
 
@@ -178,13 +178,13 @@ Module.register("mm_sleeper", {
 				playerDataWrapper.setAttribute("id", "player-list");
 				wrapper.appendChild(playerDataWrapper);
 		}
+
 		// Data from helper
 		if (this.dataNotification) {
 			var wrapperDataNotification = document.createElement("div");
 			// translations  + datanotification
 			wrapperDataNotification.innerHTML =  this.translate("UPDATE") + ": " + this.dataNotification.date;
 
-			wrapper.appendChild(wrapperDataNotification);
 		}
 		return wrapper;
 	},
@@ -210,7 +210,6 @@ Module.register("mm_sleeper", {
 
 	processData: function(data) {
 		var self = this;
-		this.dataRequest = data;
 		if (this.loaded === false) { self.updateDom(self.config.animationSpeed) ; }
 		this.loaded = true;
 
@@ -255,27 +254,61 @@ function initializeStores(request) {
 	};
 }
 
-function storeDownloadInDB(dbName,targetStore, datenAusAPI) {
-
+function openAndInitDB(dbName) {
 	var request = indexedDB.open(dbName, 7);
-	request.onerror = function(event) {
-		   window.alert(event)
+	request.onerror = function (event) {
+		window.alert(event)
 	};
 
 	request.onupgradeneeded = initializeStores(request);
-	
+	return request;
+}
 
-	request.onsuccess = function(){
+function storeDownloadInDB(targetStore, datenAusAPI) {
+
+	const dbName = "sleeperdb";
+	var request = openAndInitDB(dbName);
+
+	request.onsuccess = function () {
 		const db = request.result;
-		//console.log("db inserts...");
-		const ownerStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
+		console.log("db inserts...");
+		const objectStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
 		for (const ownerEintrag of datenAusAPI) {
-			//console.log(ownerEintrag);
-			ownerStore.add(ownerEintrag);
+			console.log(ownerEintrag);
+			objectStore.add(ownerEintrag);
 		}
+		const timeStampstore = db.transaction("timestamps", "readwrite").objectStore("timestamps");
+		timeStampstore.add({id: targetStore, ts: Date.now()})
 	}
-	 
-  }
+
+}
+
+function loadValueByIdFromStore(targetStore, lookupid) {
+	const dbName = "sleeperdb";
+
+	return new Promise(function(resolve, reject) {
+		var request = openAndInitDB(dbName);
+
+		request.onsuccess = function () {
+			const db = request.result;
+			let objectStore = db.transaction(targetStore, "readonly").objectStore(targetStore);
+			let storeRequest;
+
+			if(lookupid == null)
+				 storeRequest = objectStore.getAll();
+			else
+				storeRequest = objectStore.get(lookupid);
+
+			storeRequest.onsuccess = function(event) {
+				if (storeRequest.result) resolve(storeRequest.result);
+				else reject(Error('object not found'));
+			};
+		}
+
+	});
+
+}
+
 function prepareOwnerData(users) {
 	let ownerData = [];
 	for (var i in users) {
