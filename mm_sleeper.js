@@ -60,10 +60,11 @@ Module.register("mm_sleeper", {
 			self.updateDom();
 		}, this.config.updateInterval);
 
-		setInterval(self.myShit,10000)
+		setInterval(self.updateNFL,10000)
+		setInterval(self.updateDatabase,60000)
 	},
 
-    myShit: function(){
+    updateNFL: function(){
 	 	this.jsonDB=  [{ fname : "John", lname : "Hancock", value : 49.5 },
 					{ fname : "John", lname : "Hancock", value : 95.0 }
 					];
@@ -71,8 +72,9 @@ Module.register("mm_sleeper", {
 		// console.log(now);
 		// console.log("yeah: " + this.jsonDB[0].fname + "  ");
 		let dbDataRequest = false;
+		document.getElementById("nfl-title").innerHTML = '<i class="fas fa-football-ball"></i> TRENDING PLAYERS:';
 		// change title depending on fetched db-data:
-			document.getElementById("nfl-title").innerHTML = '<i class="fas fa-football-ball"></i> TRENDING PLAYERS:';
+			
 		
 		/*
 		if (document.getElementById("player-list")) {
@@ -107,6 +109,9 @@ Module.register("mm_sleeper", {
 		*/
 		
 	},
+	  updateDatabase: function(){
+	
+	  },
 
 	/*
 	 * getData
