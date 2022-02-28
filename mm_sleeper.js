@@ -6,8 +6,6 @@
  * By Hanno Buhmes
  * MIT Licensed.
  */
-
-
 function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback) {
 	var retry = true;
 
@@ -101,7 +99,7 @@ Module.register("mm_sleeper", {
 		urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
 		dataRequest = loadOwnersAndStoreThemToDB(urlApi, self,"trendingPlayers", prepareTrendingPlayersData);
 		dataRequest.send();
-
+		console.log(dataRequest);
 	},
 
 
@@ -125,25 +123,44 @@ Module.register("mm_sleeper", {
 
 	getDom: function() {
 		var self = this;
-
+		// include font awesome kit
+		if(!document.getElementById('font-awesome-kit')) {
+			var script = document.createElement('script');
+			script.id = 'font-awesome-kit';
+			script.src = 'https://kit.fontawesome.com/dc74e3f97e.js';
+			document.head.appendChild(script);
+		}
 		// create element wrapper for show into the module
 		var wrapper = document.createElement("div");
+			wrapper.className = "player-wrapper";
+		var wrapperDataRequest = document.createElement("div");
+			wrapperDataRequest.className = "player-data";
+		var labelDataRequest = document.createElement("label");
+			labelDataRequest.className = "title";
+		// create title
+			labelDataRequest.innerHTML = '<i class="fas fa-football-ball"></i> Trending Players:';
+		wrapper.appendChild(labelDataRequest);
+		// create player-list-wrapper
+		var playerDataWrapper = document.createElement("div");
+			playerDataWrapper.setAttribute("id", "player-list");
+		
+		var playerList = document.createElement("ul");
+			playerDataWrapper.appendChild(playerList);
 		// If this.dataRequest is not empty
 		if (this.dataRequest) {
-			var wrapperDataRequest = document.createElement("div");
-			// check format https://jsonplaceholder.typicode.com/posts/1
-			wrapperDataRequest.innerHTML = this.dataRequest.title;
-
-			var labelDataRequest = document.createElement("label");
-			// Use translate function
-			//             this id defined in translations files
-			labelDataRequest.innerHTML = this.translate("TITLE");
-
-
-			wrapper.appendChild(labelDataRequest);
-			wrapper.appendChild(wrapperDataRequest);
+			var players = this.dataRequest
+			players.forEach(renderProductList);
+			function renderProductList(element) {
+				console.log(element);
+				var li = document.createElement('li');
+				li.setAttribute('class','player');
+				playerList.appendChild(li);
+				li.innerHTML=li.innerHTML + element.player_id; // replace .player_id with .displayname
+			}
+			// append player-list-wrapper
+			wrapper.appendChild(playerDataWrapper);
 		}
-
+		
 		// Data from helper
 		if (this.dataNotification) {
 			var wrapperDataNotification = document.createElement("div");
@@ -194,6 +211,7 @@ Module.register("mm_sleeper", {
 		}
 	},
 });
+
 let db;
 // IndexedDB
 
@@ -222,7 +240,7 @@ function initializeStores(request) {
 
 function storeDownloadInDB(dbName,targetStore, datenAusAPI) {
 
-	var request = indexedDB.open(dbName, 6);
+	var request = indexedDB.open(dbName, 7);
 	request.onerror = function(event) {
 		   window.alert(event)
 	};
