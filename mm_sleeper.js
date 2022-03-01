@@ -7,7 +7,6 @@
  * MIT Licensed.
  */
 function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback) {
-	var retry = true;
 	console.log("handle: " + targetStore);
 	let responsePromise = fetch(urlApi);
 	responsePromise.then(async function (response) {
@@ -20,7 +19,7 @@ function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback)
 				storeDownloadInDB(targetStore, datenAusAPIReduziert);
 
 
-				self.processData(dataFromAPI);
+
 			});
 		} else if (response.status === 401) {
 			self.updateDom(self.config.animationSpeed);
@@ -29,9 +28,7 @@ function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback)
 		} else {
 			Log.error(self.name, "Could not load data.");
 		}
-		if (retry) {
-			self.scheduleUpdate((self.loaded) ? -1 : self.config.retryDelay);
-		}
+
 
 	});
 
@@ -60,8 +57,8 @@ Module.register("mm_sleeper", {
 			self.updateDom();
 		}, this.config.updateInterval);
 
-		setInterval(self.updateNFL,10000)
-		setInterval(self.updateDatabase,60000)
+		setInterval(self.updateNFL,5000)
+		setInterval(self.updateDatabase,10000)
 	},
 
     updateNFL: function(){
@@ -110,7 +107,17 @@ Module.register("mm_sleeper", {
 		
 	},
 	  updateDatabase: function(){
-	
+		  var urlApi = "https://api.sleeper.app/v1/league/726127230773702656/users";
+		  loadOwnersAndStoreThemToDB(urlApi, self, "owners", prepareOwnerData).then(function () {
+				  urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
+				  loadOwnersAndStoreThemToDB(urlApi, self, "trendingPlayers", prepareTrendingPlayersData).then(function () {
+					  console.log("resultchecks...")
+					  let valueByIdFromStorePromise = loadValueByIdFromStore("owners");
+					  valueByIdFromStorePromise.then(function(data){console.log(data)});
+
+				  });
+			  }
+		  );
 	  },
 
 	/*
@@ -125,17 +132,7 @@ Module.register("mm_sleeper", {
 			console.log("Ihr Browser kein IndexedDB, WTF?");
 		}
 
-		var urlApi = "https://api.sleeper.app/v1/league/726127230773702656/users";
-		loadOwnersAndStoreThemToDB(urlApi, self, "owners", prepareOwnerData).then(function () {
-				urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
-				loadOwnersAndStoreThemToDB(urlApi, self, "trendingPlayers", prepareTrendingPlayersData).then(function () {
-						console.log("resultchecks...")
-						let valueByIdFromStorePromise = loadValueByIdFromStore("owners");
-						valueByIdFromStorePromise.then(function(data){console.log(data)});
 
-					});
-			}
-		);
 
 	},
 
@@ -151,7 +148,6 @@ Module.register("mm_sleeper", {
 		if (typeof delay !== "undefined" && delay >= 0) {
 			nextLoad = delay;
 		}
-		nextLoad = nextLoad ;
 		var self = this;
 		setTimeout(function() {
 			self.getData();
