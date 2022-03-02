@@ -6,8 +6,10 @@
  * By Hanno Buhmes
  * MIT Licensed.
  */
-function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback) {
+function loadDataAndStoreToDB(formatterCallback, targetStore, urlApi, self) {
+
 	console.log("handle: " + targetStore);
+
 	let responsePromise = fetch(urlApi);
 	responsePromise.then(async function (response) {
 		console.log(response.status);
@@ -17,8 +19,6 @@ function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback)
 
 				let datenAusAPIReduziert = formatterCallback(dataFromAPI);
 				storeDownloadInDB(targetStore, datenAusAPIReduziert);
-
-
 
 			});
 		} else if (response.status === 401) {
@@ -35,11 +35,32 @@ function loadOwnersAndStoreThemToDB(urlApi, self,targetStore, formatterCallback)
 	return responsePromise;
 }
 
+function minutesSince(ts) {
+	if (ts == null) return;
+	return Math.floor((Date.now() - ts) / 60000);
+}
+
+function checkIfUpdateNeeded(store, treshold) {
+	return new Promise(function (resolve,reject) {
+		loadValueByIdFromStore("timestamps", "owners").then(
+			function (result) {
+				let minutesSince1 = minutesSince(result.ts);
+				console.log(store + " is: " + minutesSince1 + " minutes old, treshold is: " + treshold);
+				if (minutesSince1 >= treshold)
+					resolve(true);
+				else
+					resolve(false);
+			}
+		);
+	});
+
+}
+
 Module.register("mm_sleeper", {
 	defaults: {
 		updateInterval: 60000,
 		retryDelay: 5000,
-		
+
 	},
 
 	requiresVersion: "2.1.0", // Required version of MagicMirror
@@ -106,19 +127,39 @@ Module.register("mm_sleeper", {
 		*/
 		
 	},
-	  updateDatabase: function(){
-		  var urlApi = "https://api.sleeper.app/v1/league/726127230773702656/users";
-		  loadOwnersAndStoreThemToDB(urlApi, self, "owners", prepareOwnerData).then(function () {
-				  urlApi = "https://api.sleeper.app/v1/players/nfl/trending/add";
-				  loadOwnersAndStoreThemToDB(urlApi, self, "trendingPlayers", prepareTrendingPlayersData).then(function () {
-					  console.log("resultchecks...")
-					  let valueByIdFromStorePromise = loadValueByIdFromStore("owners");
-					  valueByIdFromStorePromise.then(function(data){console.log(data)});
+	updateDatabase: function () {
 
-				  });
-			  }
-		  );
-	  },
+		checkIfUpdateNeeded("owners", 24*60).then(function (updateNeeded) {
+			if (updateNeeded)
+				loadDataAndStoreToDB(prepareOwnerData, "owners", "https://api.sleeper.app/v1/league/726127230773702656/users", self)
+			else
+				console.debug("all good, no update needed ");
+		});
+
+
+		checkIfUpdateNeeded("trendingPlayers", 15).then(function (updateNeeded) {
+			if (updateNeeded)
+				loadDataAndStoreToDB(prepareTrendingPlayersData, "trendingPlayers", "https://api.sleeper.app/v1/players/nfl/trending/add", self)
+			else
+				console.debug("all good, no update needed ");
+		});
+
+		// loadDataAndStoreToDB(prepareOwnerData, "owners", "https://api.sleeper.app/v1/league/726127230773702656/users", self)
+		//   .then(function () {
+		// 		  loadDataAndStoreToDB(prepareTrendingPlayersData, "trendingPlayers", "https://api.sleeper.app/v1/players/nfl/trending/add", self)
+		// 			  .then(function () {
+		// 				  console.log("resultchecks...")
+		// 				  let valueByIdFromStorePromise = loadValueByIdFromStore("owners");
+		// 				  valueByIdFromStorePromise.then(function (data) {
+		// 					  console.log(data)
+		// 				  });
+		//
+		// 			  });
+		// 	  }
+		//   );
+
+
+	},
 
 	/*
 	 * getData
@@ -274,12 +315,22 @@ function storeDownloadInDB(targetStore, datenAusAPI) {
 		const db = request.result;
 		console.log("db inserts...");
 		const objectStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
-		for (const ownerEintrag of datenAusAPI) {
-			console.log(ownerEintrag);
-			objectStore.add(ownerEintrag);
+
+		objectStore.clear().onsuccess = function insertNew() {
+			console.log("cleared " + targetStore);
+
+			for (const ownerEintrag of datenAusAPI) {
+				objectStore.add(ownerEintrag);
+			}
+			console.log("added " + datenAusAPI.length +  " entries to " + targetStore)
+
 		}
+
 		const timeStampstore = db.transaction("timestamps", "readwrite").objectStore("timestamps");
-		timeStampstore.add({id: targetStore, ts: Date.now()})
+		let ts = Date.now();
+		timeStampstore.put({id: targetStore, ts: ts})
+		console.debug("wrote: " + targetStore + " " + ts + " to timestampstore");
+		db.close();
 	}
 
 }
