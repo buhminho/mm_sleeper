@@ -42,16 +42,20 @@ function minutesSince(ts) {
 
 function checkIfUpdateNeeded(store, treshold) {
 	return new Promise(function (resolve,reject) {
-		loadValueByIdFromStore("timestamps", "owners").then(
+		loadValueByIdFromStore("timestamps", store).then(
 			function (result) {
 				let minutesSince1 = minutesSince(result.ts);
+				console.log("found: " + result.ts);
 				console.log(store + " is: " + minutesSince1 + " minutes old, treshold is: " + treshold);
 				if (minutesSince1 >= treshold)
 					resolve(true);
 				else
 					resolve(false);
 			}
-		);
+		).catch(function () {
+			console.log("no entry found, time to change that")
+			resolve(true);
+		});
 	});
 
 }
@@ -71,15 +75,16 @@ Module.register("mm_sleeper", {
 		//Flag for check if module is loaded
 		this.loaded = false;
 
-		
+
 		// Schedule update timer.
 		this.getData();
-		setInterval(function() {
+		setInterval(function () {
 			self.updateDom();
 		}, this.config.updateInterval);
 
-		setInterval(self.updateNFL,5000)
-		setInterval(self.updateDatabase,10000)
+		openAndInitDB();
+		setInterval(self.updateNFL, 5000)
+		setInterval(self.updateDatabase, 10000)
 	},
 
     updateNFL: function(){
@@ -137,7 +142,7 @@ Module.register("mm_sleeper", {
 		});
 
 
-		checkIfUpdateNeeded("trendingPlayers", 15).then(function (updateNeeded) {
+		checkIfUpdateNeeded("trendingPlayers", 1).then(function (updateNeeded) {
 			if (updateNeeded)
 				loadDataAndStoreToDB(prepareTrendingPlayersData, "trendingPlayers", "https://api.sleeper.app/v1/players/nfl/trending/add", self)
 			else
@@ -296,7 +301,8 @@ function initializeStores(request) {
 	};
 }
 
-function openAndInitDB(dbName) {
+function openAndInitDB() {
+	const dbName = "sleeperdb";
 	var request = indexedDB.open(dbName, 7);
 	request.onerror = function (event) {
 		window.alert(event)
@@ -308,8 +314,8 @@ function openAndInitDB(dbName) {
 
 function storeDownloadInDB(targetStore, datenAusAPI) {
 
-	const dbName = "sleeperdb";
-	var request = openAndInitDB(dbName);
+
+	var request = openAndInitDB();
 
 	request.onsuccess = function () {
 		const db = request.result;
@@ -322,7 +328,7 @@ function storeDownloadInDB(targetStore, datenAusAPI) {
 			for (const ownerEintrag of datenAusAPI) {
 				objectStore.add(ownerEintrag);
 			}
-			console.log("added " + datenAusAPI.length +  " entries to " + targetStore)
+			console.log("added " + datenAusAPI.length + " entries to " + targetStore)
 
 		}
 
@@ -336,10 +342,10 @@ function storeDownloadInDB(targetStore, datenAusAPI) {
 }
 
 function loadValueByIdFromStore(targetStore, lookupid) {
-	const dbName = "sleeperdb";
+
 
 	return new Promise(function(resolve, reject) {
-		var request = openAndInitDB(dbName);
+		var request = openAndInitDB();
 
 		request.onsuccess = function () {
 			const db = request.result;
@@ -355,6 +361,7 @@ function loadValueByIdFromStore(targetStore, lookupid) {
 				if (storeRequest.result) resolve(storeRequest.result);
 				else reject(Error('object not found'));
 			};
+			db.close();
 		}
 
 	});
