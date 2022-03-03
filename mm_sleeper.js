@@ -17,8 +17,7 @@ function loadDataAndStoreToDB(formatterCallback, targetStore, urlApi, self) {
 		if (response.status === 200) {
 			await response.json().then(function (dataFromAPI) {
 
-				let datenAusAPIReduziert = formatterCallback(dataFromAPI);
-				storeDownloadInDB(targetStore, datenAusAPIReduziert);
+				formatterCallback(dataFromAPI).then(datenAusAPIReduziert => storeDownloadInDB(targetStore, datenAusAPIReduziert));
 
 			});
 		} else if (response.status === 401) {
@@ -32,7 +31,6 @@ function loadDataAndStoreToDB(formatterCallback, targetStore, urlApi, self) {
 
 	});
 
-	return responsePromise;
 }
 
 function minutesSince(ts) {
@@ -134,34 +132,43 @@ Module.register("mm_sleeper", {
 	},
 	updateDatabase: function () {
 
-		checkIfUpdateNeeded("owners", 24*60).then(function (updateNeeded) {
-			if (updateNeeded)
-				loadDataAndStoreToDB(prepareOwnerData, "owners", "https://api.sleeper.app/v1/league/726127230773702656/users", self)
-			else
-				console.debug("all good, no update needed ");
-		});
+		//BASE Tables per League
+		//TODO: multiple Leagues
+		// const leagueID = "726127230773702656";
+		const leagueID = "665226048383815680";
+
+		let targets = [
+			{
+				store: "rosters",
+				maxAge: 15,
+				processor: prepareRosterData,
+				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/rosters"
+			},
+			{
+				store: "owners",
+				maxAge: 15,
+				processor: prepareOwnerData,
+				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/users"
+			},
+			{
+				store: "trendingPlayers",
+				maxAge: 0,
+				processor: prepareTrendingPlayersData,
+				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
+			}
+		]
+
+		for (const target of targets) {
+			checkIfUpdateNeeded(target.store, target.maxAge).then(function (updateNeeded) {
+				if (updateNeeded) {
+					loadDataAndStoreToDB(target.processor, target.store, target.urlAPI, self)
+				} else
+					console.debug("all good, no update needed ");
+			});
+		}
 
 
-		checkIfUpdateNeeded("trendingPlayers", 1).then(function (updateNeeded) {
-			if (updateNeeded)
-				loadDataAndStoreToDB(prepareTrendingPlayersData, "trendingPlayers", "https://api.sleeper.app/v1/players/nfl/trending/add", self)
-			else
-				console.debug("all good, no update needed ");
-		});
-
-		// loadDataAndStoreToDB(prepareOwnerData, "owners", "https://api.sleeper.app/v1/league/726127230773702656/users", self)
-		//   .then(function () {
-		// 		  loadDataAndStoreToDB(prepareTrendingPlayersData, "trendingPlayers", "https://api.sleeper.app/v1/players/nfl/trending/add", self)
-		// 			  .then(function () {
-		// 				  console.log("resultchecks...")
-		// 				  let valueByIdFromStorePromise = loadValueByIdFromStore("owners");
-		// 				  valueByIdFromStorePromise.then(function (data) {
-		// 					  console.log(data)
-		// 				  });
-		//
-		// 			  });
-		// 	  }
-		//   );
+		// TODO: enrichLogic
 
 
 	},
@@ -284,7 +291,7 @@ function initializeStores(request) {
 		console.log("db und stores nicht vorhanden oder version höher, alles wird angelegt. ");
 
 		const db = request.result;
-		const array = ["owners", "allPlayers", "trendingPlayers", "timestamps"]
+		const array = ["owners", "allPlayers", "trendingPlayers", "timestamps", "rosters"]
 
 		array.forEach(function (storename) {
 
@@ -303,7 +310,7 @@ function initializeStores(request) {
 
 function openAndInitDB() {
 	const dbName = "sleeperdb";
-	var request = indexedDB.open(dbName, 7);
+	var request = indexedDB.open(dbName, 12);
 	request.onerror = function (event) {
 		window.alert(event)
 	};
@@ -320,8 +327,8 @@ function storeDownloadInDB(targetStore, datenAusAPI) {
 	request.onsuccess = function () {
 		const db = request.result;
 		console.log("db inserts...");
-		const objectStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
 
+		const objectStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
 		objectStore.clear().onsuccess = function insertNew() {
 			console.log("cleared " + targetStore);
 
@@ -329,7 +336,6 @@ function storeDownloadInDB(targetStore, datenAusAPI) {
 				objectStore.add(ownerEintrag);
 			}
 			console.log("added " + datenAusAPI.length + " entries to " + targetStore)
-
 		}
 
 		const timeStampstore = db.transaction("timestamps", "readwrite").objectStore("timestamps");
@@ -368,20 +374,68 @@ function loadValueByIdFromStore(targetStore, lookupid) {
 
 }
 
-function prepareOwnerData(users) {
-	let ownerData = [];
-	for (var i in users) {
-		ownerData.push({id: users[i].user_id, name: users[i].display_name, type: "ownerData", })
-	}
-	return ownerData;
+async function prepareOwnerData(users) {
+	return new Promise(function (resolve) {
+		let ownerData = [];
+		for (var i in users) {
+			ownerData.push({id: users[i].user_id, name: users[i].display_name, type: "ownerData",})
+		}
+		resolve(ownerData);
+	});
 }
 
-function prepareTrendingPlayersData(players) {
-	let ownerData = [];
-	for (var i in players) {
-		ownerData.push({id: players[i].player_id, count: players[i].count, owner: "todo" , displayname: "todo", type: "TrendingPlayers"})
-	}
-	return ownerData;
+async function prepareRosterData(users) {
+	return new Promise(function (resolve) {
+		let rosterData = [];
+		for (var i in users) {
+			rosterData.push({id: users[i].owner_id, players: users[i].players, type: "rosterData",})
+		}
+		resolve(rosterData);
+	});
+}
+
+function findOwnerOfPlayer(player_id) {
+	return new Promise(function (resolve) {
+		function searchForPlayer(owners, player_id) {
+			for (owner of owners) {
+				for (player of owner.players)
+					if (player == player_id) {
+						resolve(owner.id);
+					}
+			}
+			resolve(null);
+		}
+
+		loadValueByIdFromStore("rosters")
+			.then(result => searchForPlayer(result, player_id));
+
+	});
+}
+
+async function prepareTrendingPlayersData(players) {
+	return new Promise(async function (resolve) {
+		let tpData = [];
+		for (const player of players) {
+			await (findOwnerOfPlayer(player.player_id)).then(async ownerid => {
+					let ownername = null;
+
+					if (ownerid != null) {
+						await loadValueByIdFromStore("owners", ownerid).then(
+							result => ownername = result.name
+						)
+					}
+					tpData.push({
+						id: player.player_id,
+						count: player.count,
+						owner: ownername,
+						displayname: "todo",
+						type: "TrendingPlayers"
+					});
+				}
+			);
+		}
+		resolve(tpData);
+	});
 }
 
   
