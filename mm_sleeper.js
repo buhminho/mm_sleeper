@@ -70,7 +70,7 @@ function displayDataFromDB(id) {
 				$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS:');
 				$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
 				objectData.forEach(function (data, index, arr) {
-					if (index <= displayIndex && index >= displayInterval) list.append('<li>' + data.owner + ': ' + data.displayname + '</li>');
+					if (index <= displayIndex && index >= displayInterval) list.append('<li>' + data.id + ': ' + data.displayname + '</li>');
 				});
 				$('.progress-bar-fill').progressbar({
 					create: function( event, ui ) {$(this).css('width', '100%')},
@@ -175,7 +175,7 @@ Module.register("mm_sleeper", {
 				store: "trendingPlayers",
 				maxAge: 0,
 				processor: prepareTrendingPlayersData,
-				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/drop?limit=50" //?limit=50"
+				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
 			}
 		]
 
