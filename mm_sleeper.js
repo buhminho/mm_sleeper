@@ -57,7 +57,38 @@ function checkIfUpdateNeeded(store, treshold) {
 	});
 
 }
+function displayDataFromDB(id) {
+	loadValueByIdFromStore(id).then((objectData) => {
+		let displayIndex = 5;
+		let displayInterval = 0;
+		let delay = 5000; 
+		
+			setInterval(() => {
+				if (objectData.length >= displayIndex) {
+				$('#player-list').empty();
+				let list = $('<ul/>').appendTo('#player-list');
+				$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS:');
+				$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
+				objectData.forEach(function (data, index, arr) {
+					if (index <= displayIndex && index >= displayInterval) list.append('<li>' + data.owner + ': ' + data.displayname + '</li>');
+				});
+				$('.progress-bar-fill').progressbar({
+					create: function( event, ui ) {$(this).css('width', '100%')},
+					complete: function( event, ui ) {$(this).css('width', '0.1%')}
+				  });
 
+				displayIndex = displayIndex + 5;
+				displayInterval = displayInterval + 5;
+			}
+				else {
+					displayIndex = 5;
+					displayInterval = 0;
+				}
+			}, delay);
+		
+		
+	});
+}
 Module.register("mm_sleeper", {
 	defaults: {
 		updateInterval: 60000,
@@ -81,53 +112,43 @@ Module.register("mm_sleeper", {
 		}, this.config.updateInterval);
 
 		openAndInitDB();
-		setInterval(self.updateNFL, 5000)
+		setInterval(self.updateNFL("trendingPlayers"), 20000)
 		setInterval(self.updateDatabase, 10000)
 	},
 
-    updateNFL: function(){
+    updateNFL: function(id){
 	 	this.jsonDB=  [{ fname : "John", lname : "Hancock", value : 49.5 },
 					{ fname : "John", lname : "Hancock", value : 95.0 }
 					];
 		var now = new Date();
+		if (!window.jQuery){
+			var script = document.createElement('script');
+			script.id = 'jquery-cdn';
+			script.src = "//ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js";
+			script.onload = function() {
+				var jqueryui = document.createElement('script');
+				var link = document.createElement("link");
+				 	link.type = "text/css";
+  					link.rel = "stylesheet";
+					link.href = "//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css";
+				jqueryui.src = "//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js";
+				console.log("added jquery ui");
+				jqueryui.onload = function() {
+					displayDataFromDB("trendingPlayers");
+				};
+				document.getElementsByTagName("head")[0].appendChild(link);
+				document.getElementsByTagName("head")[0].appendChild(jqueryui);
+			  };
+			document.getElementsByTagName("head")[0].appendChild(script);
+		}
+		else {
+			console.log("jQuery exists!");
+			displayDataFromDB("trendingPlayers");
+		}
+		//if (id == "trendingPlayers") document.getElementById("nfl-title").innerHTML = '<i class="fas fa-football-ball"></i> TRENDING PLAYERS:';
+		//displayDataFromDB("trendingPlayers");
 		// console.log(now);
 		// console.log("yeah: " + this.jsonDB[0].fname + "  ");
-		let dbDataRequest = false;
-		document.getElementById("nfl-title").innerHTML = '<i class="fas fa-football-ball"></i> TRENDING PLAYERS:';
-		// change title depending on fetched db-data:
-			
-		
-		/*
-		if (document.getElementById("player-list")) {
-			var playerDataWrapper = document.getElementById("player-list");
-			var playerList = document.createElement("ul");
-				playerDataWrapper.appendChild(playerList);
-			// If this.dataRequest is not empty
-			if (dbDataRequest) {
-				var players = this.dataRequest;
-				players.forEach(player => {
-					console.log(Object.keys(player));
-					var li = document.createElement('li');
-					li.setAttribute('class','player');
-					playerList.appendChild(li);
-					// Show 
-					if (player.type == "ownerData") li.innerHTML=li.innerHTML + player.name;
-					if (player.type == "TrendingPlayers") li.innerHTML=li.innerHTML + player.displayname;
-				});
-			
-
-				// append player-list-wrapper
-				wrapper.appendChild(playerDataWrapper);
-					if (this.dataRequest.some(e => e.type === 'ownerData')) {
-						alert("OWNER DATA");
-					}
-					if (this.dataRequest.some(e => e.type === 'TrendingPlayers')) {
-						alert("TRENDING PLAYERS");
-					}
-				
-			}
-		}
-		*/
 		
 	},
 	updateDatabase: function () {
@@ -154,7 +175,7 @@ Module.register("mm_sleeper", {
 				store: "trendingPlayers",
 				maxAge: 0,
 				processor: prepareTrendingPlayersData,
-				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
+				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/drop?limit=50" //?limit=50"
 			}
 		]
 
@@ -216,8 +237,8 @@ Module.register("mm_sleeper", {
 			script.src = 'https://kit.fontawesome.com/dc74e3f97e.js';
 			document.head.appendChild(script);
 		}
+		
 		// create element wrapper for show into the module
-	
 		if (!document.getElementById("player-wrapper")) {
 			var wrapper = document.createElement("div");
 				wrapper.className = "player-wrapper";
