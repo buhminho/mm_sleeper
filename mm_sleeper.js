@@ -178,7 +178,7 @@ Module.register("mm_sleeper", {
 			},
 			{
 				store: "trendingPlayers",
-				maxAge: 5,
+				maxAge: 0,
 				processor: prepareTrendingPlayersData,
 				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
 			},
@@ -469,27 +469,42 @@ function findOwnerOfPlayer(player_id) {
 	});
 }
 
+async function findPlayer(player_id) {
+	return new Promise(function (resolve) {
+
+		loadValueByIdFromStore("players", player_id)
+			.then(result => resolve(result));
+
+	});
+}
+
 async function prepareTrendingPlayersData(players) {
 	return new Promise(async function (resolve) {
 		let tpData = [];
 		for (const player of players) {
-			await (findOwnerOfPlayer(player.player_id)).then(async ownerid => {
-					let ownername = null;
+			await findPlayer(player.player_id).then(async playerFromDB => {
+				const displayname = playerFromDB.first_name + " " + playerFromDB.last_name + " (" + playerFromDB.position + ") " + (playerFromDB.team!=null?playerFromDB.team:"");
+				await (findOwnerOfPlayer(player.player_id)).then(async ownerid => {
+						let ownername = null;
 
-					if (ownerid != null) {
-						await loadValueByIdFromStore("owners", ownerid).then(
-							result => ownername = result.name
-						)
+						if (ownerid != null) {
+							await loadValueByIdFromStore("owners", ownerid).then(
+								result => ownername = result.name
+							)
+						}
+						tpData.push({
+							id: player.player_id,
+							count: player.count,
+							owner: ownername,
+							displayname: displayname,
+							type: "TrendingPlayers"
+						});
 					}
-					tpData.push({
-						id: player.player_id,
-						count: player.count,
-						owner: ownername,
-						displayname: "todo",
-						type: "TrendingPlayers"
-					});
-				}
-			);
+				);
+
+			});
+
+
 		}
 		resolve(tpData);
 	});
