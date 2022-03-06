@@ -74,11 +74,8 @@ function displayDataFromDB(id) {
 					$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
 					
 					objectData.forEach(function (data, index, arr) {
-						let owner;
 						if (index <= displayIndex && index >= displayInterval) {
-							if (data.owner == null) owner = "Free Agent";
-							else owner = data.owner;
-							list.append('<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + owner + '</span><span class="list-col-player">' + data.displayname + '</span></li>');
+							list.append('<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + ((data.owner!=null)?data.owner:'Free Agent') + '</span><span class="list-col-player">' + data.displayname + '</span></li>');
 						}
 					});
 					$('.progress-bar-fill').progressbar({
@@ -162,7 +159,7 @@ Module.register("mm_sleeper", {
 		let targets = [
 			{
 				store: "rosters",
-				maxAge: 15,
+				maxAge: 0,
 				processor: prepareRosterData,
 				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/rosters"
 			},
@@ -174,7 +171,7 @@ Module.register("mm_sleeper", {
 			},
 			{
 				store: "trendingPlayers",
-				maxAge: 0,
+				maxAge: 5,
 				processor: prepareTrendingPlayersData,
 				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
 			}
@@ -399,8 +396,9 @@ function loadValueByIdFromStore(targetStore, lookupid) {
 async function prepareOwnerData(users) {
 	return new Promise(function (resolve) {
 		let ownerData = [];
-		for (var i in users) {
-			ownerData.push({id: users[i].user_id, name: users[i].display_name, type: "ownerData",})
+		for (const {user_id, display_name} of users) {
+
+			ownerData.push({id: user_id, name: display_name, type: "ownerData",})
 		}
 		resolve(ownerData);
 	});
@@ -409,8 +407,9 @@ async function prepareOwnerData(users) {
 async function prepareRosterData(users) {
 	return new Promise(function (resolve) {
 		let rosterData = [];
-		for (var i in users) {
-			rosterData.push({id: users[i].owner_id, players: users[i].players, type: "rosterData",})
+
+		for (const {owner_id, players}  of users) {
+			rosterData.push({id: owner_id, players: players, type: "rosterData",})
 		}
 		resolve(rosterData);
 	});
