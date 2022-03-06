@@ -159,7 +159,7 @@ Module.register("mm_sleeper", {
 		let targets = [
 			{
 				store: "rosters",
-				maxAge: 0,
+				maxAge: 15,
 				processor: prepareRosterData,
 				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/rosters"
 			},
@@ -170,10 +170,23 @@ Module.register("mm_sleeper", {
 				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/users"
 			},
 			{
+				store: "players",
+				maxAge: 24*60,
+				processor: preparePlayerData,
+				urlAPI: "https://api.sleeper.app/v1/players/nfl"
+				// urlAPI: "https://b85211ee-09ec-437d-943e-eb06de1e4294.mock.pstmn.io/allPlayers"
+			},
+			{
 				store: "trendingPlayers",
 				maxAge: 5,
 				processor: prepareTrendingPlayersData,
 				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
+			},
+			{
+				store: "trendingPlayersDropped",
+				maxAge: 5,
+				processor: prepareTrendingPlayersData,
+				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/drop" //?limit=50"
 			}
 		]
 
@@ -310,7 +323,7 @@ function initializeStores(request) {
 		console.log("db und stores nicht vorhanden oder version höher, alles wird angelegt. ");
 
 		const db = request.result;
-		const array = ["owners", "allPlayers", "trendingPlayers", "timestamps", "rosters"]
+		const array = ["owners", "allPlayers", "trendingPlayers", "timestamps", "rosters", "trendingPlayersDropped", "players"]
 
 		array.forEach(function (storename) {
 
@@ -329,7 +342,7 @@ function initializeStores(request) {
 
 function openAndInitDB() {
 	const dbName = "sleeperdb";
-	var request = indexedDB.open(dbName, 12);
+	var request = indexedDB.open(dbName, 15);
 	request.onerror = function (event) {
 		window.alert(event)
 	};
@@ -404,11 +417,34 @@ async function prepareOwnerData(users) {
 	});
 }
 
+async function preparePlayerData(players) {
+	return new Promise(function (resolve) {
+		let playerData = [];
+
+
+		function* entries(obj) {
+			for (let key of Object.keys(obj)) {
+				yield [key, obj[key]];
+			}
+		}
+
+		for (let [key, value] of entries(players)) {
+			playerData.push({
+				id: key, first_name: value.first_name, last_name: value.last_name,
+				position: value.position, team: value.team, type: "playerData",
+			})
+		}
+
+
+		resolve(playerData);
+	});
+}
+
 async function prepareRosterData(users) {
 	return new Promise(function (resolve) {
 		let rosterData = [];
 
-		for (const {owner_id, players}  of users) {
+		for (const {owner_id, players} of users) {
 			rosterData.push({id: owner_id, players: players, type: "rosterData",})
 		}
 		resolve(rosterData);
