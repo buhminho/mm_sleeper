@@ -59,7 +59,7 @@ function checkIfUpdateNeeded(store, treshold) {
 }
 
 function displayDataFromDB(id) {
-	loadValueByIdFromStore(id).then((objectData) => {
+	loadValueByIdFromStore(id, null).then((objectData) => {
 		let displayIndex = 5;
 		let displayInterval = 0;
 		let delay = 5000; 
@@ -104,7 +104,7 @@ Module.register("mm_sleeper", {
 	},
 
 	requiresVersion: "2.1.0", // Required version of MagicMirror
-	
+
 	start: function() {
 		var self = this;
 
@@ -122,32 +122,8 @@ Module.register("mm_sleeper", {
 		setInterval(self.updateNFL("trendingPlayers"), 20000)
 		setInterval(self.updateDatabase, 10000)
 	},
-
     updateNFL: function(id){
-		// inject jQuery
-		if (!window.jQuery){
-			var script = document.createElement('script');
-			script.id = 'jquery-cdn';
-			script.src = "//ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js";
-			script.onload = function() {
-				var jqueryui = document.createElement('script');
-				var link = document.createElement("link");
-				 	link.type = "text/css";
-  					link.rel = "stylesheet";
-					link.href = "//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css";
-				jqueryui.src = "//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js";
-				console.log("added jquery ui");
-				jqueryui.onload = function() {
-					displayDataFromDB("trendingPlayers");
-				};
-				document.getElementsByTagName("head")[0].appendChild(link);
-				document.getElementsByTagName("head")[0].appendChild(jqueryui);
-			  };
-			document.getElementsByTagName("head")[0].appendChild(script);
-		}
-		else {
-			displayDataFromDB("trendingPlayers");
-		}		
+		displayDataFromDB("trendingPlayers");
 	},
 	updateDatabase: function () {
 
@@ -241,14 +217,7 @@ Module.register("mm_sleeper", {
 
 	getDom: function() {
 		var self = this;
-		// include font awesome kit
-		if(!document.getElementById('font-awesome-kit')) {
-			var script = document.createElement('script');
-			script.id = 'font-awesome-kit';
-			script.src = 'https://kit.fontawesome.com/dc74e3f97e.js';
-			document.head.appendChild(script);
-		}
-		
+
 		// create element wrapper for show into the module
 		if (!document.getElementById("player-wrapper")) {
 			var wrapper = document.createElement("div");
@@ -276,12 +245,17 @@ Module.register("mm_sleeper", {
 	},
 
 	getScripts: function() {
-		return [];
+		return [
+			'jquery-3.6.0.min.js',
+			'jquery-ui.min.js',
+			'font-awesome-kit.js'
+		]
 	},
 
 	getStyles: function () {
 		return [
 			"mm_sleeper.css",
+			"jquery-ui.min.css"
 		];
 	},
 
