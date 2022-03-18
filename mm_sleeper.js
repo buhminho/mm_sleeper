@@ -58,41 +58,48 @@ function checkIfUpdateNeeded(store, treshold) {
 
 }
 
+function initializeEmptyWithHeaders(page, maxpage) {
+	$("#player-list").hide();
+	$('#player-list').empty();
+	let list = $('<ul/>').appendTo('#player-list');
+	$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS'+ ' (' + page + '/' + maxpage+')');
+	$('#nfl-title').append('<div class="player-list-header"><span class="list-col-count"> count </span><span class="list-col-owner"> owner </span><span class="list-col-player">player</span></div>');
+	$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
+	return list;
+}
+
+function singleRow(data) {
+	return '<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + ((data.owner != null) ? data.owner : 'Free Agent') + '</span><span class="list-col-player">' + data.displayname + '</span></li>';
+}
+
 function displayDataFromDB(id) {
 	loadValueByIdFromStore(id, null).then((objectData) => {
-		let displayIndex = 5;
-		let displayInterval = 0;
-		let delay = 5000; 
-		objectData.sort((a,b)=> (a.count < b.count ? 1 : -1))
-			setInterval(() => {
-				if (objectData.length < displayIndex) {
-					displayIndex = 5;
-					displayInterval = 0;
+		let displayIndex = 0;
+		let displayInterval = 4;
+		let page=0;
+		let delay = 5000;
+		objectData.sort((a,b)=> (a.count < b.count ? 1 : -1));
+
+		setInterval(() => {
+			if (objectData.length < displayIndex) {
+				displayIndex = page = 0;
+			}
+			let list = initializeEmptyWithHeaders(++page,Math.ceil(objectData.length/displayInterval));
+
+			objectData.slice(displayIndex, displayIndex+displayInterval).forEach(function (data) {
+				list.append(singleRow(data));
+			});
+			$('.progress-bar-fill').progressbar({
+				create: function (event, ui) {
+					$("#player-list").fadeIn("slow");
+					$(this).css('width', '100%')
 				}
-				$("#player-list").hide();
-				$('#player-list').empty();
-				let list = $('<ul/>').appendTo('#player-list');
-				$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS:');
-				$('#nfl-title').append('<div class="player-list-header"><span class="list-col-count"> count </span><span class="list-col-owner"> owner </span><span class="list-col-player">player</span></div>');
-				$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
-
-				objectData.forEach(function (data, index, arr) {
-					if (index <= displayIndex && index >= displayInterval) {
-						list.append('<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + ((data.owner!=null)?data.owner:'Free Agent') + '</span><span class="list-col-player">' + data.displayname + '</span></li>');
-					}
-				});
-				$('.progress-bar-fill').progressbar({
-					create: function( event, ui ) {
-						$("#player-list").fadeIn("slow");
-						$(this).css('width', '100%')
-					}
-				});
-				displayIndex = displayIndex + 5;
-				displayInterval = displayInterval + 5;
+			});
+			displayIndex = displayIndex + displayInterval;
 
 
 
-			}, delay);
+		}, delay);
 		
 		
 	});
