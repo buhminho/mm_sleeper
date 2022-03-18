@@ -66,31 +66,32 @@ function displayDataFromDB(id) {
 		objectData.sort((a,b)=> (a.count < b.count ? 1 : -1))
 			setInterval(() => {
 				if (objectData.length >= displayIndex) {
-					$("#player-list").hide();
-					$('#player-list').empty();
-					let list = $('<ul/>').appendTo('#player-list');
-					$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS:');
-					$('#nfl-title').append('<div class="player-list-header"><span class="list-col-count"> count </span><span class="list-col-owner"> owner </span><span class="list-col-player">player</span></div>');
-					$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
-					
-					objectData.forEach(function (data, index, arr) {
-						if (index <= displayIndex && index >= displayInterval) {
-							list.append('<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + ((data.owner!=null)?data.owner:'Free Agent') + '</span><span class="list-col-player">' + data.displayname + '</span></li>');
-						}
-					});
-					$('.progress-bar-fill').progressbar({
-						create: function( event, ui ) {
-							$("#player-list").fadeIn("slow");
-							$(this).css('width', '100%')
-						}
-					});
-					displayIndex = displayIndex + 5;
-					displayInterval = displayInterval + 5;
-			}
-				else {
 					displayIndex = 5;
 					displayInterval = 0;
 				}
+				$("#player-list").hide();
+				$('#player-list').empty();
+				let list = $('<ul/>').appendTo('#player-list');
+				$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS:');
+				$('#nfl-title').append('<div class="player-list-header"><span class="list-col-count"> count </span><span class="list-col-owner"> owner </span><span class="list-col-player">player</span></div>');
+				$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
+
+				objectData.forEach(function (data, index, arr) {
+					if (index <= displayIndex && index >= displayInterval) {
+						list.append('<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + ((data.owner!=null)?data.owner:'Free Agent') + '</span><span class="list-col-player">' + data.displayname + '</span></li>');
+					}
+				});
+				$('.progress-bar-fill').progressbar({
+					create: function( event, ui ) {
+						$("#player-list").fadeIn("slow");
+						$(this).css('width', '100%')
+					}
+				});
+				displayIndex = displayIndex + 5;
+				displayInterval = displayInterval + 5;
+
+
+
 			}, delay);
 		
 		
@@ -154,7 +155,7 @@ Module.register("mm_sleeper", {
 			},
 			{
 				store: "trendingPlayers",
-				maxAge: 0,
+				maxAge: 10,
 				processor: prepareTrendingPlayersData,
 				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
 			},
