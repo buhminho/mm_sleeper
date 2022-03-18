@@ -65,7 +65,7 @@ function displayDataFromDB(id) {
 		let delay = 5000; 
 		objectData.sort((a,b)=> (a.count < b.count ? 1 : -1))
 			setInterval(() => {
-				if (objectData.length >= displayIndex) {
+				if (objectData.length < displayIndex) {
 					displayIndex = 5;
 					displayInterval = 0;
 				}
