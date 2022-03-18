@@ -6,9 +6,10 @@
  * By Hanno Buhmes
  * MIT Licensed.
  */
+
 function loadDataAndStoreToDB(formatterCallback, targetStore, urlApi, self) {
 
-	console.log("handle: " + targetStore);
+	console.debug("handle: " + targetStore);
 
 	let responsePromise = fetch(urlApi);
 	responsePromise.then(async function (response) {
@@ -38,13 +39,15 @@ function minutesSince(ts) {
 	return Math.floor((Date.now() - ts) / 60000);
 }
 
+
+
 function checkIfUpdateNeeded(store, treshold) {
 	return new Promise(function (resolve,reject) {
-		loadValueByIdFromStore("timestamps", store).then(
+		loadValueByIdFromStore(TIMESTAMPS_STORE, store).then(
 			function (result) {
 				let minutesSince1 = minutesSince(result.ts);
-				console.log("found: " + result.ts);
-				console.log(store + " is: " + minutesSince1 + " minutes old, treshold is: " + treshold);
+				console.debug("found: " + result.ts);
+				console.debug(store + " is: " + minutesSince1 + " minutes old, treshold is: " + treshold);
 				if (minutesSince1 >= treshold)
 					resolve(true);
 				else
@@ -58,52 +61,87 @@ function checkIfUpdateNeeded(store, treshold) {
 
 }
 
-function initializeEmptyWithHeaders(page, maxpage) {
+function initializeEmptyWithHeaders(page, maxpage, header) {
 	$("#player-list").hide();
 	$('#player-list').empty();
 	let list = $('<ul/>').appendTo('#player-list');
-	$('#nfl-title').html('<i class="fas fa-football-ball"></i> TRENDING PLAYERS'+ ' (' + page + '/' + maxpage+')');
+	$('#nfl-title').html('<i class="fas fa-football-ball"></i> ' + header + ' ('+ TRENDINGLOOKBACKHOURS+'h) ' + page + '/' + maxpage+'');
+
 	$('#nfl-title').append('<div class="player-list-header"><span class="list-col-count"> count </span><span class="list-col-owner"> owner </span><span class="list-col-player">player</span></div>');
 	$('#nfl-title').append('<div class="progress-bar"><span class="progress-bar-fill" style="width: 0.1%"></span></div>');
 	return list;
 }
 
 function singleRow(data) {
-	return '<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">' + ((data.owner != null) ? data.owner : 'Free Agent') + '</span><span class="list-col-player">' + data.displayname + '</span></li>';
+	return '<li><span class="list-col-count">' + data.count + '</span><span class="list-col-owner">'
+		+ ((data.owner != null) ? data.owner : 'Free Agent') + '</span><span class="list-col-player">'
+		+ data.displayname + '</span></li>';
 }
 
-function displayDataFromDB(id) {
-	loadValueByIdFromStore(id, null).then((objectData) => {
-		let displayIndex = 0;
-		let displayInterval = 4;
-		let page=0;
-		let delay = 5000;
-		objectData.sort((a,b)=> (a.count < b.count ? 1 : -1));
 
-		setInterval(() => {
-			if (objectData.length < displayIndex) {
-				displayIndex = page = 0;
+
+function translateHeader(header) {
+	if (header===TRENDING_PLAYERS_STORE) return "ADDED PLAYERS";
+	if (header===TRENDING_PLAYERS_DROPPED_STORE) return "DROPPED PLAYERS";
+	return header;
+}
+
+async function displayDataFromDB(ids) {
+	let objectData = await loadValueByIdFromStore(ids[0], null);
+	objectData.sort((a, b) => (a.count < b.count ? 1 : -1));
+	let delay = 5000;
+	let displayIndex = 0;
+	let pagesize = 6;
+	let page = 0;
+	let header=ids[0];
+
+	setInterval(() => {
+
+		if (objectData.length <= displayIndex) {
+			displayIndex = page = 0;
+		}
+
+		let list = initializeEmptyWithHeaders(++page, Math.ceil(objectData.length / pagesize), translateHeader(header));
+
+		objectData.slice(displayIndex, displayIndex + pagesize).forEach(function (data) {
+			list.append(singleRow(data));
+		});
+		$('.progress-bar-fill').progressbar({
+			create: function (event, ui) {
+				$("#player-list").fadeIn("slow");
+				$(this).css('width', '100%')
 			}
-			let list = initializeEmptyWithHeaders(++page,Math.ceil(objectData.length/displayInterval));
-
-			objectData.slice(displayIndex, displayIndex+displayInterval).forEach(function (data) {
-				list.append(singleRow(data));
-			});
-			$('.progress-bar-fill').progressbar({
-				create: function (event, ui) {
-					$("#player-list").fadeIn("slow");
-					$(this).css('width', '100%')
-				}
-			});
-			displayIndex = displayIndex + displayInterval;
+		});
+		displayIndex = displayIndex + pagesize;
 
 
+	}, delay);
 
-		}, delay);
-		
-		
-	});
+	let idx = 0;
+	setInterval(async () => {
+		idx = (idx === ids.length-1) ? 0 : (idx + 1);
+		console.debug("switching to " + ids[idx]);
+		objectData = await loadValueByIdFromStore(ids[idx], null);
+		objectData.sort((a, b) => (a.count < b.count ? 1 : -1));
+		header=ids[idx];
+		displayIndex = page = 0;
+
+	}, delay * 2  * Math.ceil(TRENDINGPLAYERLIMIT / pagesize));
+
+
 }
+
+const TRENDING_PLAYERS_STORE = "trendingPlayers";
+const TRENDING_PLAYERS_DROPPED_STORE = "trendingPlayersDropped";
+const ROSTERS_STORE = "rosters";
+const OWNERS_STORE = "owners";
+const PLAYERS_STORE = "players";
+const TIMESTAMPS_STORE = "timestamps";
+const TRENDINGLOOKBACKHOURS = 8;
+const TRENDINGPLAYERLIMIT = 20;
+const DB_VERSION = 17;
+const DBNAME = "sleeperdb";
+
 Module.register("mm_sleeper", {
 	defaults: {
 		updateInterval: 60000,
@@ -114,7 +152,7 @@ Module.register("mm_sleeper", {
 	requiresVersion: "2.1.0", // Required version of MagicMirror
 
 	start: function() {
-		var self = this;
+		const self = this;
 
 		//Flag for check if module is loaded
 		this.loaded = false;
@@ -127,11 +165,11 @@ Module.register("mm_sleeper", {
 		}, this.config.updateInterval);
 
 		openAndInitDB();
-		setInterval(self.updateNFL("trendingPlayers"), 20000)
+		setInterval(self.updateNFL(TRENDING_PLAYERS_STORE, TRENDING_PLAYERS_DROPPED_STORE), 20000)
 		setInterval(self.updateDatabase, 10000)
 	},
-    updateNFL: function(id){
-		displayDataFromDB("trendingPlayers");
+	updateNFL: function (...ids) {
+		displayDataFromDB(ids);
 	},
 	updateDatabase: function () {
 
@@ -140,37 +178,38 @@ Module.register("mm_sleeper", {
 		// const leagueID = "726127230773702656";
 		const leagueID = "665226048383815680";
 
+
 		let targets = [
 			{
-				store: "rosters",
+				store: ROSTERS_STORE,
 				maxAge: 15,
 				processor: prepareRosterData,
 				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/rosters"
 			},
 			{
-				store: "owners",
+				store: OWNERS_STORE,
 				maxAge: 15,
 				processor: prepareOwnerData,
 				urlAPI: "https://api.sleeper.app/v1/league/" + leagueID + "/users"
 			},
 			{
-				store: "players",
+				store: PLAYERS_STORE,
 				maxAge: 24*60,
 				processor: preparePlayerData,
 				urlAPI: "https://api.sleeper.app/v1/players/nfl"
 				// urlAPI: "https://b85211ee-09ec-437d-943e-eb06de1e4294.mock.pstmn.io/allPlayers"
 			},
 			{
-				store: "trendingPlayers",
-				maxAge: 10,
-				processor: prepareTrendingPlayersData,
-				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add" //?limit=50"
-			},
-			{
-				store: "trendingPlayersDropped",
+				store: TRENDING_PLAYERS_STORE,
 				maxAge: 5,
 				processor: prepareTrendingPlayersData,
-				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/drop" //?limit=50"
+				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=" + TRENDINGLOOKBACKHOURS + "&limit=" + TRENDINGPLAYERLIMIT
+			},
+			{
+				store: TRENDING_PLAYERS_DROPPED_STORE,
+				maxAge: 5,
+				processor: prepareTrendingPlayersData,
+				urlAPI: "https://api.sleeper.app/v1/players/nfl/trending/drop?lookback_hours=" + TRENDINGLOOKBACKHOURS + "&limit=" + TRENDINGPLAYERLIMIT
 			}
 		]
 
@@ -305,26 +344,27 @@ function initializeStores(request) {
 		console.log("db und stores nicht vorhanden oder version höher, alles wird angelegt. ");
 
 		const db = request.result;
-		const array = ["owners", "allPlayers", "trendingPlayers", "timestamps", "rosters", "trendingPlayersDropped", "players"]
+		const array = [OWNERS_STORE, TRENDING_PLAYERS_STORE, TIMESTAMPS_STORE, ROSTERS_STORE, TRENDING_PLAYERS_DROPPED_STORE, PLAYERS_STORE]
 
 		array.forEach(function (storename) {
 
 			try {
-				console.log("deleting " + storename);
+				console.debug("deleting " + storename);
 				db.deleteObjectStore(storename)
 			} catch (e) {
 				console.log(storename + " did not exist")
 			}
 			db.createObjectStore(storename, {keyPath: "id"});
-			console.log("created " + storename);
+			console.debug("created " + storename);
 		});
 
 	};
 }
 
+
 function openAndInitDB() {
-	const dbName = "sleeperdb";
-	var request = indexedDB.open(dbName, 15);
+
+	var request = indexedDB.open(DBNAME, DB_VERSION);
 	request.onerror = function (event) {
 		window.alert(event)
 	};
@@ -340,19 +380,19 @@ function storeDownloadInDB(targetStore, datenAusAPI) {
 
 	request.onsuccess = function () {
 		const db = request.result;
-		console.log("db inserts...");
+		console.debug("db inserts...");
 
 		const objectStore = db.transaction(targetStore, "readwrite").objectStore(targetStore);
 		objectStore.clear().onsuccess = function insertNew() {
-			console.log("cleared " + targetStore);
+			console.debug("cleared " + targetStore);
 
 			for (const ownerEintrag of datenAusAPI) {
 				objectStore.add(ownerEintrag);
 			}
-			console.log("added " + datenAusAPI.length + " entries to " + targetStore)
+			console.debug("added " + datenAusAPI.length + " entries to " + targetStore)
 		}
 
-		const timeStampstore = db.transaction("timestamps", "readwrite").objectStore("timestamps");
+		const timeStampstore = db.transaction(TIMESTAMPS_STORE, "readwrite").objectStore(TIMESTAMPS_STORE);
 		let ts = Date.now();
 		timeStampstore.put({id: targetStore, ts: ts})
 		console.debug("wrote: " + targetStore + " " + ts + " to timestampstore");
@@ -433,20 +473,20 @@ async function prepareRosterData(users) {
 	});
 }
 
-function findOwnerOfPlayer(player_id) {
+function findOwnerOfPlayer(player_search_id) {
 	return new Promise(function (resolve) {
-		function searchForPlayer(owners, player_id) {
-			for (owner of owners) {
-				for (player of owner.players)
-					if (player == player_id) {
-						resolve(owner.id);
+		function searchForPlayer(owners, player_search_id) {
+			for (const{id, players} of owners) {
+				for (const player_id of players)
+					if (player_id === player_search_id) {
+						resolve(id);
 					}
 			}
 			resolve(null);
 		}
 
 		loadValueByIdFromStore("rosters")
-			.then(result => searchForPlayer(result, player_id));
+			.then(result => searchForPlayer(result, player_search_id));
 
 	});
 }
@@ -470,7 +510,7 @@ async function prepareTrendingPlayersData(players) {
 						let ownername = null;
 
 						if (ownerid != null) {
-							await loadValueByIdFromStore("owners", ownerid).then(
+							await loadValueByIdFromStore(OWNERS_STORE, ownerid).then(
 								result => ownername = result.name
 							)
 						}
